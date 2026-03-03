@@ -76,15 +76,6 @@ func getExchangeRate(arguments Arguments) (string, error) {
 	fileName := fmt.Sprintf("/tmp/%s", arguments.from)
 	jsonResponse := map[string]map[string]float64{}
 
-	// TODO: API Calls should just be cached based on their 
-	//       arguments.from , not both arguments.from and 
-	//       arguments.to . 
-	//
-	//       A call from USD:GBP and USD:NOK can just be 
-	//       cached as a call from USD, as USD would 
-	//       contain the exchange rates both for NOK 
-	//       and GBP.
-
 	// Cache the API calls so that we don't hit our rate limit.
 	fi, err := os.Stat(fileName)
 
@@ -131,7 +122,10 @@ func getExchangeRate(arguments Arguments) (string, error) {
 		}
 
 		// then Write this out to the file, we already know it exists.
-		marshaledBytes, _ := json.Marshal(jsonResponse)
+		marshaledBytes, err := json.Marshal(jsonResponse)
+		if err != nil {
+			return "", err
+		}
 		// Make the file here
 		newFile, err := os.Create(fileName) 
 		defer newFile.Close()
