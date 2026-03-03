@@ -1,4 +1,4 @@
-# currencyconverter - A Currency Conversion Utility
+# currency
 
 A small currency conversion command.
 
