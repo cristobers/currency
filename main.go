@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+//  "io"
 //  "reflect"
     "strings"
     "net/http"
@@ -66,30 +67,39 @@ func parse(args []string) (*Arguments, error) {
 }
 
 func getExchangeRate(arguments Arguments) (string, error) {
-	// TODO: cache API calls so we don't annoy the API too much.
 	baseUrl := "https://api.freecurrencyapi.com/v1/latest?apikey=%s&base_currency=%s"
 	key     := os.Getenv(apiEnvironmentKeyName)
 	apiUrl  := fmt.Sprintf(baseUrl, key, arguments.from)
 
 	// Check if we have this api call cached within /tmp/
-	fileName := fmt.Sprintf("/tmp/%s:%s", arguments.from, arguments.to)
+	//fileName := fmt.Sprintf("/tmp/%s:%s", arguments.from, arguments.to)
+	fileName := fmt.Sprintf("/tmp/%s", arguments.from)
 	jsonResponse := map[string]map[string]float64{}
 
+	// TODO: API Calls should just be cached based on their 
+	//       arguments.from , not both arguments.from and 
+	//       arguments.to . 
+	//
+	//       A call from USD:GBP and USD:NOK can just be 
+	//       cached as a call from USD, as USD would 
+	//       contain the exchange rates both for NOK 
+	//       and GBP.
+
+	// Cache the API calls so that we don't hit our rate limit.
 	fi, err := os.Stat(fileName)
 
 	fileExists := err == nil
 	if fileExists {
 		diff := fileModificationTimeDiffCurrentTime(fi)
 		if diff >= ONE_HOUR {
-			fmt.Println("update me vro")
-			resp, err := http.Get(apiUrl)
+			// The rates are old, we should update them.
+			resp, err := getExchangeRateAPI(apiUrl)
+			defer resp.Body.Close()
 			if err != nil {
-				fmt.Printf("Failed to send get request to %s:%s\n", apiUrl, err)
 				return "", err
 			}
-			defer resp.Body.Close()
 
-			err = json.NewDecoder(resp.Body).Decode(&jsonResponse)
+			err = decodeJsonData(jsonResponse, *resp)
 			if err != nil {
 				return "", err
 			}
@@ -108,27 +118,27 @@ func getExchangeRate(arguments Arguments) (string, error) {
 		}
 	} else {
 		// the file doesn't exist, we need to write one :)
-		resp, err := http.Get(apiUrl)
+		// First grab the exchange rates
+		resp, err := getExchangeRateAPI(apiUrl)
+		defer resp.Body.Close()
 		if err != nil {
-			fmt.Printf("Failed to send get request to %s:%s\n", apiUrl, err)
 			return "", err
 		}
-		defer resp.Body.Close()
 
-		err = json.NewDecoder(resp.Body).Decode(&jsonResponse)
+		err = decodeJsonData(jsonResponse, *resp)
 		if err != nil {
 			return "", err
 		}
 
 		// then Write this out to the file, we already know it exists.
-		foo, _ := json.Marshal(jsonResponse)
+		marshaledBytes, _ := json.Marshal(jsonResponse)
 		// Make the file here
 		newFile, err := os.Create(fileName) 
 		defer newFile.Close()
 		if err != nil {
 			return "", err
 		}
-		nBytes, err := newFile.Write(foo)
+		nBytes, err := newFile.Write(marshaledBytes)
 		if err != nil {
 			return "", err
 		}
@@ -137,6 +147,22 @@ func getExchangeRate(arguments Arguments) (string, error) {
 	innerJsonResponse := jsonResponse["data"]
 	s := fmt.Sprint(innerJsonResponse[arguments.to])
 	return s, nil
+}
+
+func decodeJsonData(jsonResponse map[string]map[string]float64, resp http.Response) error {
+	err := json.NewDecoder(resp.Body).Decode(&jsonResponse)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func getExchangeRateAPI(apiUrl string) (*http.Response, error) {
+	resp, err := http.Get(apiUrl)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to send get request to %s:%s\n", apiUrl, err)
+	}
+	return resp, nil
 }
 
 func fileModificationTimeDiffCurrentTime(fi os.FileInfo) int64 {
