@@ -3,13 +3,13 @@ package main
 import (
 	"fmt"
 	"os"
-//  "io"
-//  "reflect"
-    "strings"
-    "net/http"
+	//  "io"
+	//  "reflect"
 	"encoding/json"
-	"time"
 	"io/ioutil"
+	"net/http"
+	"strings"
+	"time"
 
 	"github.com/bojanz/currency"
 )
@@ -24,12 +24,13 @@ type Arguments struct {
 }
 
 func main() {
-	arguments, err := parse(os.Args);
+	arguments, err := parse(os.Args)
 	if err != nil {
-		fmt.Println("Failed to parse:", err);
-		os.Exit(1);
+		fmt.Println("Failed to parse:", err)
+		helper()
+		os.Exit(1)
 	}
-	
+
 	// Check if our API key exists
 	_, exists := os.LookupEnv(apiEnvironmentKeyName)
 	if !exists {
@@ -39,27 +40,31 @@ func main() {
 
 	rate, err := getExchangeRate(*arguments)
 	if err != nil {
-		fmt.Println("Failed to get exchange rate:", err);
+		fmt.Println("Failed to get exchange rate:", err)
 		os.Exit(1)
 	}
 	temp, err := convert(*arguments, rate)
 	if err != nil {
-		fmt.Println("Failed to convert:", err);
+		fmt.Println("Failed to convert:", err)
 		os.Exit(1)
 	}
 	outputConvertedCurrency(*arguments, *temp)
 }
 
+func helper() {
+	fmt.Println("./currency <amount> <from> <to>")
+}
+
 func parse(args []string) (*Arguments, error) {
 	slicedArgs := args[1:]
 	if len(slicedArgs) != 3 {
-		return nil, fmt.Errorf("Incorrect number of arguments.");
+		return nil, fmt.Errorf("Incorrect number of arguments.")
 	}
 
 	slicedArgs = convertArgumentsToUppercase(slicedArgs)
 
 	amnt, f, t := slicedArgs[0], slicedArgs[1], slicedArgs[2]
-	return &Arguments {
+	return &Arguments{
 		amount: amnt,
 		from:   f,
 		to:     t,
@@ -68,8 +73,8 @@ func parse(args []string) (*Arguments, error) {
 
 func getExchangeRate(arguments Arguments) (string, error) {
 	baseUrl := "https://api.freecurrencyapi.com/v1/latest?apikey=%s&base_currency=%s"
-	key     := os.Getenv(apiEnvironmentKeyName)
-	apiUrl  := fmt.Sprintf(baseUrl, key, arguments.from)
+	key := os.Getenv(apiEnvironmentKeyName)
+	apiUrl := fmt.Sprintf(baseUrl, key, arguments.from)
 
 	// Check if we have this api call cached within /tmp/
 	//fileName := fmt.Sprintf("/tmp/%s:%s", arguments.from, arguments.to)
@@ -105,7 +110,7 @@ func getExchangeRate(arguments Arguments) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			err   = json.Unmarshal(b, &jsonResponse)
+			err = json.Unmarshal(b, &jsonResponse)
 		}
 	} else {
 		// the file doesn't exist, we need to write one :)
@@ -127,7 +132,7 @@ func getExchangeRate(arguments Arguments) (string, error) {
 			return "", err
 		}
 		// Make the file here
-		newFile, err := os.Create(fileName) 
+		newFile, err := os.Create(fileName)
 		defer newFile.Close()
 		if err != nil {
 			return "", err
@@ -173,7 +178,7 @@ func outputConvertedCurrency(arguments Arguments, amount currency.Amount) {
 
 func convertArgumentsToUppercase(args []string) []string {
 	for i := 0; i < len(args); i++ {
-		args[i] = strings.ToUpper(args[i]);
+		args[i] = strings.ToUpper(args[i])
 	}
 	return args
 }
@@ -184,11 +189,11 @@ func convert(arguments Arguments, rate string) (*currency.Amount, error) {
 		fmt.Println("Failed to create a new amount:", err)
 		return nil, fmt.Errorf("Failed to create a new amount")
 	}
-	temp, err  = temp.Convert(arguments.to, rate)
+	temp, err = temp.Convert(arguments.to, rate)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to convert")
 	}
-	temp, err  = temp.Mul(arguments.amount)
+	temp, err = temp.Mul(arguments.amount)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to multiply")
 	}
