@@ -1,13 +1,10 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	//  "io"
-	//  "reflect"
 	"encoding/json"
-	"io/ioutil"
+	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -90,10 +87,10 @@ func getExchangeRate(arguments Arguments) (string, error) {
 		if diff >= ONE_HOUR {
 			// The rates are old, we should update them.
 			resp, err := getExchangeRateAPI(apiUrl)
-			defer resp.Body.Close()
 			if err != nil {
 				return "", err
 			}
+			defer resp.Body.Close()
 
 			err = decodeJsonData(jsonResponse, *resp)
 			if err != nil {
@@ -102,11 +99,11 @@ func getExchangeRate(arguments Arguments) (string, error) {
 
 			// then Write this out to the file, we already know it exists.
 			foo, _ := json.Marshal(jsonResponse)
-			ioutil.WriteFile(fileName, foo, 0644)
+			os.WriteFile(fileName, foo, 0644)
 		} else {
 			// File exists, and its modify time is less than one hour.
 			// Read the file, get the JSON data and decode it
-			b, err := ioutil.ReadFile(fileName)
+			b, err := os.ReadFile(fileName)
 			if err != nil {
 				return "", err
 			}
@@ -116,10 +113,10 @@ func getExchangeRate(arguments Arguments) (string, error) {
 		// the file doesn't exist, we need to write one :)
 		// First grab the exchange rates
 		resp, err := getExchangeRateAPI(apiUrl)
-		defer resp.Body.Close()
 		if err != nil {
 			return "", err
 		}
+		defer resp.Body.Close()
 
 		err = decodeJsonData(jsonResponse, *resp)
 		if err != nil {
@@ -133,10 +130,11 @@ func getExchangeRate(arguments Arguments) (string, error) {
 		}
 		// Make the file here
 		newFile, err := os.Create(fileName)
-		defer newFile.Close()
 		if err != nil {
 			return "", err
 		}
+		defer newFile.Close()
+
 		nBytes, err := newFile.Write(marshaledBytes)
 		if err != nil {
 			return "", err
